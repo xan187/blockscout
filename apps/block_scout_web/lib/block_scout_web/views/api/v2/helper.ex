@@ -54,11 +54,24 @@ defmodule BlockScoutWeb.API.V2.Helper do
   """
   @spec address_with_info(any(), any()) :: nil | %{optional(String.t()) => any()}
   def address_with_info(
-        %Address{proxy_implementations: %NotLoaded{}, contract_code: contract_code} = _address,
+        %Address{proxy_implementations: %NotLoaded{}, contract_code: contract_code} = address,
         _address_hash
       )
       when not is_nil(contract_code) do
-    raise "proxy_implementations is not loaded for address"
+    smart_contract? = Address.smart_contract?(address)
+
+    %{
+      "hash" => Address.checksum(address),
+      "is_contract" => smart_contract?,
+      "name" => address_name(address),
+      # todo: added for backward compatibility, remove when frontend unbound from these props
+      "implementation_address" => nil,
+      "implementation_name" => nil,
+      "implementations" => [],
+      "is_verified" => verified?(address),
+      "ens_domain_name" => address.ens_domain_name,
+      "metadata" => address.metadata
+    }
   end
 
   def address_with_info(%Address{} = address, _address_hash) do
