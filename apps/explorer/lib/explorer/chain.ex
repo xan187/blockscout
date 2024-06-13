@@ -363,9 +363,10 @@ defmodule Explorer.Chain do
     |> select_repo(options).all()
   end
 
-  @spec address_to_logs(Hash.Address.t(), Keyword.t()) :: [Log.t()]
+  @spec address_to_logs(Hash.Address.t(), [paging_options | necessity_by_association_option | api?]) :: [Log.t()]
   def address_to_logs(address_hash, csv_export?, options \\ []) when is_list(options) do
     paging_options = Keyword.get(options, :paging_options) || %PagingOptions{page_size: 50}
+    necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
 
     case paging_options do
       %PagingOptions{key: {0, 0}} ->
@@ -402,13 +403,14 @@ defmodule Explorer.Chain do
             base
           else
             base
-            |> preload(transaction: [:to_address, :from_address])
+            |> preload(transaction: [from_address: [:proxy_implementations], to_address: [:proxy_implementations]])
           end
 
         preloaded_query
         |> page_logs(paging_options)
         |> filter_topic(Keyword.get(options, :topic))
         |> where_block_number_in_period(from_block, to_block)
+        |> join_associations(necessity_by_association)
         |> select_repo(options).all()
         |> Enum.take(paging_options.page_size)
     end
@@ -1674,7 +1676,7 @@ defmodule Explorer.Chain do
         elements
 
       blocks ->
-        blocks
+        blocks |> Repo.preload(Map.keys(necessity_by_association))
     end
   end
 
@@ -3009,7 +3011,7 @@ defmodule Explorer.Chain do
 
         {:error, reason} ->
           Logger.error(fn ->
-            ["Error while fetching first trace for tx: #{hash_string} error reason: ", reason]
+            ["Error while fetching first trace for tx: #{hash_string} error reason: ", to_string(reason)]
           end)
 
           fetch_tx_revert_reason_using_call(transaction)
@@ -3707,7 +3709,7 @@ defmodule Explorer.Chain do
 
     Instance
     |> where([instance], not is_nil(instance.error))
-    |> where([instance], is_nil(instance.refetch_after) or instance.refetch_after > ^DateTime.utc_now())
+    |> where([instance], is_nil(instance.refetch_after) or instance.refetch_after < ^DateTime.utc_now())
     |> select([instance], %{
       contract_address_hash: instance.token_contract_address_hash,
       token_id: instance.token_id
@@ -3722,16 +3724,16 @@ defmodule Explorer.Chain do
   end
 
   @doc """
-  Streams a list of token contract addresses that have been cataloged.
+  Streams a list of tokens that have been cataloged.
   """
-  @spec stream_cataloged_token_contract_address_hashes(
+  @spec stream_cataloged_tokens(
           initial :: accumulator,
-          reducer :: (entry :: Hash.Address.t(), accumulator -> accumulator),
+          reducer :: (entry :: Token.t(), accumulator -> accumulator),
           some_time_ago_updated :: integer(),
           limited? :: boolean()
         ) :: {:ok, accumulator}
         when accumulator: term()
-  def stream_cataloged_token_contract_address_hashes(initial, reducer, some_time_ago_updated \\ 2880, limited? \\ false)
+  def stream_cataloged_tokens(initial, reducer, some_time_ago_updated \\ 2880, limited? \\ false)
       when is_function(reducer, 2) do
     some_time_ago_updated
     |> Token.cataloged_tokens()
@@ -3918,6 +3920,8 @@ defmodule Explorer.Chain do
     base = config[:exp_timeout_base]
     max_refetch_interval = config[:max_refetch_interval]
 
+    max_retry_count = :math.log(max_refetch_interval / 1000 / coef) / :math.log(base)
+
     from(
       token_instance in Instance,
       update: [
@@ -3934,7 +3938,7 @@ defmodule Explorer.Chain do
             fragment(
               """
               CASE WHEN EXCLUDED.metadata IS NULL THEN
-                NOW() AT TIME ZONE 'UTC' + LEAST(interval '1 seconds' * (? * ? ^ (? + 1)), interval '1 milliseconds' * ?)
+                NOW() AT TIME ZONE 'UTC' + interval '1 seconds' * (? * ? ^ LEAST(? + 1.0, ?))
               ELSE
                 NULL
               END
@@ -3942,7 +3946,7 @@ defmodule Explorer.Chain do
               ^coef,
               ^base,
               token_instance.retries_count,
-              ^max_refetch_interval
+              ^max_retry_count
             )
         ]
       ],
