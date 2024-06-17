@@ -1,4 +1,4 @@
-# NftMediaHandler
+# NFTMediaHandler
 
 **TODO: Add description**
 

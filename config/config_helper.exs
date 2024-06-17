@@ -279,6 +279,17 @@ defmodule ConfigHelper do
     end
   end
 
+  @spec parse_url_env_var(String.t(), boolean()) :: String.t()
+  def parse_url_env_var(env_var, trailing_slash_needed? \\ false) do
+    url = env_var |> System.get_env() |> String.trim_trailing("/")
+
+    if trailing_slash_needed? do
+      url <> "/"
+    else
+      url
+    end
+  end
+
   @supported_chain_types [
     "default",
     "arbitrum",

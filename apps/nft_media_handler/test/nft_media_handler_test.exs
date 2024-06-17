@@ -1,8 +1,8 @@
 defmodule NftMediaHandlerTest do
   use ExUnit.Case
-  doctest NftMediaHandler
+  doctest NFTMediaHandler
 
   test "greets the world" do
-    assert NftMediaHandler.hello() == :world
+    assert NFTMediaHandler.hello() == :world
   end
 end
