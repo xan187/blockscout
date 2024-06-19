@@ -112,7 +112,7 @@ defmodule Indexer.Block.Catchup.Sequence do
   Adds a range of block numbers to the end of the sequence.
   """
   @spec push_back(GenServer.server(), Range.t()) :: :ok | {:error, String.t()}
-  def push_back(sequence, _first.._last = range) do
+  def push_back(sequence, _first.._last//_ = range) do
     GenServer.call(sequence, {:push_back, range})
   end
 
@@ -120,7 +120,7 @@ defmodule Indexer.Block.Catchup.Sequence do
   Adds a range of block numbers to the front of the sequence.
   """
   @spec push_front(GenServer.server(), Range.t()) :: :ok | {:error, String.t()}
-  def push_front(sequence, _first.._last = range) do
+  def push_front(sequence, _first.._last//_ = range) do
     GenServer.call(sequence, {:push_front, range})
   end
 
@@ -164,7 +164,11 @@ defmodule Indexer.Block.Catchup.Sequence do
   end
 
   @spec handle_call({:push_back, Range.t()}, GenServer.from(), t()) :: {:reply, :ok | {:error, String.t()}, t()}
-  def handle_call({:push_back, _first.._last = range}, _from, %__MODULE__{bound_queue: bound_queue, step: step} = state) do
+  def handle_call(
+        {:push_back, _first.._last//_ = range},
+        _from,
+        %__MODULE__{bound_queue: bound_queue, step: step} = state
+      ) do
     case push_chunked_range(bound_queue, step, range) do
       {:ok, updated_bound_queue} ->
         {:reply, :ok, %__MODULE__{state | bound_queue: updated_bound_queue}}
@@ -176,7 +180,7 @@ defmodule Indexer.Block.Catchup.Sequence do
 
   @spec handle_call({:push_front, Range.t()}, GenServer.from(), t()) :: {:reply, :ok | {:error, String.t()}, t()}
   def handle_call(
-        {:push_front, _first.._last = range},
+        {:push_front, _first.._last//_ = range},
         _from,
         %__MODULE__{bound_queue: bound_queue, step: step} = state
       ) do
@@ -235,7 +239,7 @@ defmodule Indexer.Block.Catchup.Sequence do
 
   @spec push_chunked_range(BoundQueue.t(Range.t()), step, Range.t(), edge()) ::
           {:ok, BoundQueue.t(Range.t())} | {:error, reason :: String.t()}
-  defp push_chunked_range(bound_queue, step, _.._ = range, edge \\ :back)
+  defp push_chunked_range(bound_queue, step, _.._//_ = range, edge \\ :back)
        when is_integer(step) and edge in [:back, :front] do
     with {:error, [reason]} <- push_chunked_ranges(bound_queue, step, [range], edge) do
       {:error, reason}
@@ -275,21 +279,21 @@ defmodule Indexer.Block.Catchup.Sequence do
     end)
   end
 
-  defp reduce_chunked_range(_.._ = range, step, initial, reducer) do
+  defp reduce_chunked_range(_.._//_ = range, step, initial, reducer) do
     count = Enum.count(range)
     reduce_chunked_range(range, count, step, initial, reducer)
   end
 
-  defp reduce_chunked_range(first..last = range, _count, step, _initial, _reducer)
+  defp reduce_chunked_range(first..last//_ = range, _count, step, _initial, _reducer)
        when (step < 0 and first < last) or (0 < step and last < first) do
     {:error, "Range (#{inspect(range)}) direction is opposite step (#{step}) direction"}
   end
 
-  defp reduce_chunked_range(first..last, count, step, initial, reducer) when count <= abs(step) do
+  defp reduce_chunked_range(first..last//_, count, step, initial, reducer) when count <= abs(step) do
     reducer.({first, last}, initial)
   end
 
-  defp reduce_chunked_range(first..last, _, step, initial, reducer) do
+  defp reduce_chunked_range(first..last//_, _, step, initial, reducer) do
     {sign, comparator} =
       if step > 0 do
         {1, &Kernel.>=/2}
