@@ -991,14 +991,14 @@ config :indexer, Indexer.Fetcher.PolygonZkevm.TransactionBatch.Supervisor,
 config :ex_aws,
   json_codec: Jason,
   access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
-  secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
-  bucket_name: System.get_env("AWS_BUCKET_NAME")
+  secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY")
 
 config :ex_aws, :s3,
   scheme: "https://",
   host: System.get_env("AWS_BUCKET_HOST"),
   port: nil,
-  public_r2_url: ConfigHelper.parse_url_env_var("AWS_PUBLIC_BUCKET_URL", false)
+  public_r2_url: ConfigHelper.parse_url_env_var("AWS_PUBLIC_BUCKET_URL", false),
+  bucket_name: System.get_env("AWS_BUCKET_NAME")
 
 Code.require_file("#{config_env()}.exs", "config/runtime")
 

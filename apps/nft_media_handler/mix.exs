@@ -33,7 +33,8 @@ defmodule NFTMediaHandler.MixProject do
       {:jason, "~> 1.3"},
       {:hackney, "~> 1.9"},
       {:sweet_xml, "~> 0.7"},
-      {:image, "~> 0.48.1"}
+      {:image, "~> 0.48.1"},
+      {:httpoison, "~> 2.0"}
     ]
   end
 end
