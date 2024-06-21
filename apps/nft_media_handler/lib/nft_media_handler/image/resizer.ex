@@ -6,21 +6,22 @@ defmodule NFTMediaHandler.Image.Resizer do
   @sizes [{20, "20x20"}, {30, "30x30"}, {190, "190x190"}, {300, "300x300"}]
   require Logger
 
-  def resize(file_path, image) do
+  def resize(file_path, image, url, extension) do
     max_size = max(Image.width(image), Image.height(image))
 
     Enum.map(@sizes, fn {int_size, size} ->
-      new_file_name = "#{file_path}_no_minimize.#{size}.jpg"
-
+      # "#{file_path}_no_minimize.#{size}#{extension}"
+      new_file_name = generate_file_name(url, extension, size)
+      # , minimize_file_size: false
       with {:size, true} <- {:size, max_size >= int_size},
            {:ok, resized_image} <- Image.thumbnail(image, size, []),
-           {:ok, _result} <- Image.write(resized_image, new_file_name, minimize_file_size: false) |> dbg() do
-        {size, File.read!(new_file_name)}
+           {:ok, _result} <- Image.write(resized_image, "./" <> new_file_name) |> dbg() do
+        {size, File.read!(new_file_name), new_file_name}
       else
         error ->
           error_message =
             case error do
-              {:size, _} -> "Skipped #{size} resizing due to small image"
+              {:size, _} -> "Skipped #{size} resizing due to small image size"
               error -> "Error while #{size} resizing: #{inspect(error)}"
             end
 
@@ -32,4 +33,8 @@ defmodule NFTMediaHandler.Image.Resizer do
   end
 
   def sizes, do: @sizes
+
+  def generate_file_name(url, extension, size) do
+    "#{:sha |> :crypto.hash("#{url}_#{DateTime.to_unix(DateTime.utc_now())}") |> Base.encode16(case: :lower)}_#{size}#{extension}"
+  end
 end

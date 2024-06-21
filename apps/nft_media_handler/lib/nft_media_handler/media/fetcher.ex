@@ -3,6 +3,23 @@ defmodule NFTMediaHandler.Media.Fetcher do
     Module fetches media from various sources
   """
 
+  def fetch_media(url) when is_binary(url) do
+    with media_type when not is_nil(media_type) <- media_type(url),
+         {:ok, %HTTPoison.Response{status_code: 200, body: body}} <-
+           HTTPoison.get(url, [], follow_redirect: true, max_body_length: 10_000_000) do
+      {:ok, media_type, body}
+    else
+      nil ->
+        {:error, :unsupported_media_type}
+
+      {:ok, %HTTPoison.Response{status_code: status_code, body: _body}} ->
+        {:error, status_code}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   def media_type("data:image/" <> data) do
     [type, _] = String.split(data, ";", parts: 2)
     {"image", type}
