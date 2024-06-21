@@ -48,28 +48,31 @@ defmodule Indexer.Fetcher.Withdrawal do
 
     if first_block |> Helper.parse_integer() |> is_integer() do
       # withdrawals from all other blocks will be imported by realtime and catchup indexers
-      json_rpc_named_arguments = opts[:json_rpc_named_arguments]
-
-      unless json_rpc_named_arguments do
+      unless opts[:json_rpc_named_arguments] do
         raise ArgumentError,
               ":json_rpc_named_arguments must be provided to `#{__MODULE__}.init to allow for json_rpc calls when running."
       end
 
-      state = %__MODULE__{
-        blocks_to_fetch: first_block |> Helper.parse_integer() |> missing_block_numbers(),
-        interval: opts[:interval] || @interval,
-        json_rpc_named_arguments: json_rpc_named_arguments,
-        max_batch_size: opts[:max_batch_size] || @batch_size,
-        max_concurrency: opts[:max_concurrency] || @concurrency
-      }
-
-      Process.send_after(self(), :fetch_withdrawals, state.interval)
-
-      {:ok, state}
+      {:ok, %{}, {:continue, {opts, first_block}}}
     else
       Logger.warn("Please, specify the first block of the block range for #{__MODULE__}.")
       :ignore
     end
+  end
+
+  @impl GenServer
+  def handle_continue({opts, first_block}, _state) do
+    state = %__MODULE__{
+      blocks_to_fetch: first_block |> Helper.parse_integer() |> missing_block_numbers(),
+      interval: opts[:interval] || @interval,
+      json_rpc_named_arguments: opts[:json_rpc_named_arguments],
+      max_batch_size: opts[:max_batch_size] || @batch_size,
+      max_concurrency: opts[:max_concurrency] || @concurrency
+    }
+
+    Process.send_after(self(), :fetch_withdrawals, state.interval)
+
+    {:noreply, state}
   end
 
   @impl GenServer
