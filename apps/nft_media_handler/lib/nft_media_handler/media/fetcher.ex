@@ -3,13 +3,17 @@ defmodule NFTMediaHandler.Media.Fetcher do
     Module fetches media from various sources
   """
 
+  @supported_image_types ["png", "jpeg", "gif", "svg+xml"]
+  @supported_video_types ["mp4"]
+
   def fetch_media(url) when is_binary(url) do
-    with media_type when not is_nil(media_type) <- media_type(url),
+    with media_type <- media_type(url),
+         {:support, true} <- {:support, media_type_supported?(media_type)},
          {:ok, %HTTPoison.Response{status_code: 200, body: body}} <-
            HTTPoison.get(url, [], follow_redirect: true, max_body_length: 10_000_000) do
       {:ok, media_type, body}
     else
-      nil ->
+      {:support, false} ->
         {:error, :unsupported_media_type}
 
       {:ok, %HTTPoison.Response{status_code: status_code, body: _body}} ->
@@ -59,6 +63,19 @@ defmodule NFTMediaHandler.Media.Fetcher do
   end
 
   def media_type(nil), do: nil
+
+  @spec media_type_supported?(any()) :: boolean()
+  def media_type_supported?({"image", image_type}) when image_type in @supported_image_types do
+    true
+  end
+
+  def media_type_supported?({"video", video_type}) when video_type in @supported_video_types do
+    true
+  end
+
+  def media_type_supported?(_) do
+    false
+  end
 
   def process_missing_extension(media_src) do
     case HTTPoison.head(media_src, [], follow_redirect: true) do

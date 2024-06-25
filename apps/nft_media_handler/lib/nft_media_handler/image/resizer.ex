@@ -10,13 +10,13 @@ defmodule NFTMediaHandler.Image.Resizer do
     max_size = max(Image.width(image), Image.height(image))
 
     Enum.map(@sizes, fn {int_size, size} ->
-      # "#{file_path}_no_minimize.#{size}#{extension}"
       new_file_name = generate_file_name(url, extension, size)
-      # , minimize_file_size: false
+      path = file_path <> new_file_name
+
       with {:size, true} <- {:size, max_size >= int_size},
            {:ok, resized_image} <- Image.thumbnail(image, size, []),
-           {:ok, _result} <- Image.write(resized_image, "./" <> new_file_name) |> dbg() do
-        {size, File.read!(new_file_name), new_file_name}
+           {:ok, _result} <- Image.write(resized_image, path) |> dbg() do
+        {size, File.read!(path), new_file_name}
       else
         error ->
           error_message =

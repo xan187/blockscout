@@ -58,12 +58,12 @@ defmodule NFTMediaHandler do
     |> Map.put("original", uploaded_original_url)
   end
 
-  def prepare_and_upload_by_url(url, file_name) do
+  def prepare_and_upload_by_url(url) do
     with {:ok, {type, subtype} = media_type, body} <- Fetcher.fetch_media(url) |> dbg(),
-         {:ok, image} <- Image.from_binary(body) do
+         {:image, {:ok, image}} <- {:image, Image.from_binary(body)} do
       [extension | _] = MIME.extensions("#{type}/#{subtype}")
 
-      thumbnails = Resizer.resize("./", image, url, ".#{extension}") |> dbg()
+      thumbnails = Resizer.resize("../../images/", image, url, ".#{extension}") |> dbg()
 
       uploaded_thumbnails =
         Enum.map(thumbnails, fn {size, image, file_name} ->
@@ -109,6 +109,14 @@ defmodule NFTMediaHandler do
         end
       end)
       |> Map.put("original", uploaded_original_url)
+    else
+      {:error, reason} ->
+        Logger.warning("Error on fetching media from url (#{url}): #{inspect(reason)}")
+        :error
+
+      {:image, {:error, reason}} ->
+        Logger.warning("Error on open image from url (#{url}): #{inspect(reason)}")
+        :error
     end
   end
 
