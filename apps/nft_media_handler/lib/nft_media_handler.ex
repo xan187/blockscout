@@ -5,6 +5,7 @@ defmodule NFTMediaHandler do
 
   require Logger
 
+  alias Image.Video
   alias NFTMediaHandler.Media.Fetcher
   alias NFTMediaHandler.Image.Resizer
   alias NFTMediaHandler.R2.Uploader
@@ -59,9 +60,18 @@ defmodule NFTMediaHandler do
   end
 
   def prepare_and_upload_by_url(url) do
-    with {:ok, {type, subtype} = media_type, body} <- Fetcher.fetch_media(url) |> dbg(),
-         {:image, {:ok, image}} <- {:image, Image.from_binary(body)} do
-      [extension | _] = MIME.extensions("#{type}/#{subtype}")
+    with {:ok, media_type, body} <- Fetcher.fetch_media(url) do
+      prepare_and_upload_inner(media_type, body, url)
+    else
+      {:error, reason} ->
+        Logger.warning("Error on fetching media from url (#{url}): #{inspect(reason)}")
+        :error
+    end
+  end
+
+  def prepare_and_upload_inner({"image", _} = media_type, body, url) do
+    with {:image, {:ok, image}} <- {:image, Image.from_binary(body)} do
+      extension = media_type_to_extension(media_type)
 
       thumbnails = Resizer.resize("../../images/", image, url, ".#{extension}") |> dbg()
 
@@ -110,14 +120,40 @@ defmodule NFTMediaHandler do
       end)
       |> Map.put("original", uploaded_original_url)
     else
-      {:error, reason} ->
-        Logger.warning("Error on fetching media from url (#{url}): #{inspect(reason)}")
-        :error
-
       {:image, {:error, reason}} ->
         Logger.warning("Error on open image from url (#{url}): #{inspect(reason)}")
         :error
     end
+  end
+
+  def prepare_and_upload_inner({"video", _} = media_type, body, url) do
+    extension = media_type_to_extension(media_type)
+    file_name = Resizer.generate_file_name(url, ".jpg", "original")
+    path = "../../images/#{file_name}"
+
+    with :ok <- File.write(path, body),
+         {:ok, video} = Video.open(path),
+         {:ok, image} <- Video.image_from_video(video, frame: 0) do
+      thumbnails = Resizer.resize("../../images/", image, url, ".jpg")
+
+      uploaded_thumbnails =
+        Enum.map(thumbnails, fn {size, image, file_name} ->
+          # generate_file_name(file_name, size)
+          with {:ok, _result, uploaded_file_url} <- Uploader.upload_image(image, file_name) do
+            {size, uploaded_file_url}
+          else
+            _ ->
+              nil
+          end
+        end)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.into(%{})
+    end
+  end
+
+  defp media_type_to_extension({type, subtype}) do
+    [extension | _] = MIME.extensions("#{type}/#{subtype}")
+    extension
   end
 
   defp generate_file_name(image_name, size \\ "original") do

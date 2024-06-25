@@ -10,7 +10,7 @@ defmodule NFTMediaHandler.Media.Fetcher do
     with media_type <- media_type(url),
          {:support, true} <- {:support, media_type_supported?(media_type)},
          {:ok, %HTTPoison.Response{status_code: 200, body: body}} <-
-           HTTPoison.get(url, [], follow_redirect: true, max_body_length: 10_000_000) do
+           HTTPoison.get(url, [], follow_redirect: true, max_body_length: 20_000_000) do
       {:ok, media_type, body}
     else
       {:support, false} ->
