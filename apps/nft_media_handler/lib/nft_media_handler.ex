@@ -9,6 +9,7 @@ defmodule NFTMediaHandler do
   alias NFTMediaHandler.Media.Fetcher
   alias NFTMediaHandler.Image.Resizer
   alias NFTMediaHandler.R2.Uploader
+  alias Vix.Vips.Image, as: VipsImage
 
   @spec prepare_media_and_upload(binary() | File.Stream.t(), any()) :: map()
   def prepare_media_and_upload(file_path, file_name) do
@@ -64,7 +65,7 @@ defmodule NFTMediaHandler do
       prepare_and_upload_inner(media_type, body, url)
     else
       {:error, reason} ->
-        Logger.warning("Error on fetching media from url (#{url}): #{inspect(reason)}")
+        Logger.warning("Error on fetching media: #{inspect(reason)}, from url (#{url})")
         :error
     end
   end
@@ -73,11 +74,10 @@ defmodule NFTMediaHandler do
     with {:image, {:ok, image}} <- {:image, Image.from_binary(body)} do
       extension = media_type_to_extension(media_type)
 
-      thumbnails = Resizer.resize("../../images/", image, url, ".#{extension}") |> dbg()
+      thumbnails = Resizer.resize(image, url, ".#{extension}")
 
       uploaded_thumbnails =
         Enum.map(thumbnails, fn {size, image, file_name} ->
-          # generate_file_name(file_name, size)
           with {:ok, _result, uploaded_file_url} <- Uploader.upload_image(image, file_name) do
             {size, uploaded_file_url}
           else
@@ -88,11 +88,11 @@ defmodule NFTMediaHandler do
         |> Enum.reject(&is_nil/1)
         |> Enum.into(%{})
 
-      #  {:ok, binary} <- File.read(file_path),
-
       uploaded_original_url =
-        with {:ok, _result, uploaded_file_url} <-
-               Uploader.upload_image(body, Resizer.generate_file_name(url, ".#{extension}", "original")) do
+        with file_name = Resizer.generate_file_name(url, ".#{extension}", "original"),
+             {:ok, binary} <- image_to_binary(image, file_name, ".#{extension}"),
+             {:ok, _result, uploaded_file_url} <-
+               Uploader.upload_image(binary, Resizer.generate_file_name(url, ".#{extension}", "original")) do
           uploaded_file_url
         else
           _ ->
@@ -128,26 +128,24 @@ defmodule NFTMediaHandler do
 
   def prepare_and_upload_inner({"video", _} = media_type, body, url) do
     extension = media_type_to_extension(media_type)
-    file_name = Resizer.generate_file_name(url, ".jpg", "original")
+    file_name = Resizer.generate_file_name(url, ".#{extension}", "original")
     path = "../../images/#{file_name}"
 
     with :ok <- File.write(path, body),
          {:ok, video} = Video.open(path),
-         {:ok, image} <- Video.image_from_video(video, frame: 0) do
-      thumbnails = Resizer.resize("../../images/", image, url, ".jpg")
+         {:ok, image} <- Video.image_from_video(video, frame: 1) do
+      thumbnails = Resizer.resize(image, url, ".jpg")
 
-      uploaded_thumbnails =
-        Enum.map(thumbnails, fn {size, image, file_name} ->
-          # generate_file_name(file_name, size)
-          with {:ok, _result, uploaded_file_url} <- Uploader.upload_image(image, file_name) do
-            {size, uploaded_file_url}
-          else
-            _ ->
-              nil
-          end
-        end)
-        |> Enum.reject(&is_nil/1)
-        |> Enum.into(%{})
+      Enum.map(thumbnails, fn {size, image, file_name} ->
+        with {:ok, _result, uploaded_file_url} <- Uploader.upload_image(image, file_name) do
+          {size, uploaded_file_url}
+        else
+          _ ->
+            nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.into(%{})
     end
   end
 
@@ -158,5 +156,15 @@ defmodule NFTMediaHandler do
 
   defp generate_file_name(image_name, size \\ "original") do
     "#{image_name}_#{size}.jpg"
+  end
+
+  def image_to_binary(resized_image, _file_name, extension) when extension in [".jpg", ".png"] do
+    VipsImage.write_to_buffer(resized_image, "#{extension}[Q=75,strip]")
+  end
+
+  def image_to_binary(resized_image, file_name, ".gif") do
+    path = "../../images/#{file_name}.gif"
+    VipsImage.write_to_file(resized_image, path)
+    File.read(path)
   end
 end

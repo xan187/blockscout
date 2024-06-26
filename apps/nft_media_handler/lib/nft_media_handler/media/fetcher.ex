@@ -24,15 +24,15 @@ defmodule NFTMediaHandler.Media.Fetcher do
     end
   end
 
-  def media_type("data:image/" <> data) do
-    [type, _] = String.split(data, ";", parts: 2)
-    {"image", type}
-  end
+  # def media_type("data:image/" <> data) do
+  #   [type, _] = String.split(data, ";", parts: 2)
+  #   {"image", type}
+  # end
 
-  def media_type("data:video/" <> data) do
-    [type, _] = String.split(data, ";", parts: 2)
-    {"video", type}
-  end
+  # def media_type("data:video/" <> data) do
+  #   [type, _] = String.split(data, ";", parts: 2)
+  #   {"video", type}
+  # end
 
   def media_type("data:" <> _data) do
     nil
@@ -54,6 +54,7 @@ defmodule NFTMediaHandler.Media.Fetcher do
         ext
         |> MIME.type()
       end
+      |> dbg()
 
     if mime_type do
       mime_type |> String.split("/") |> List.to_tuple()
