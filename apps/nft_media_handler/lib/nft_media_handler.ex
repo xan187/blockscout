@@ -71,7 +71,7 @@ defmodule NFTMediaHandler do
   end
 
   def prepare_and_upload_inner({"image", _} = media_type, body, url) do
-    with {:image, {:ok, image}} <- {:image, Image.from_binary(body)} do
+    with {:image, {:ok, image}} <- {:image, Image.from_binary(body, pages: -1)} do
       extension = media_type_to_extension(media_type)
 
       thumbnails = Resizer.resize(image, url, ".#{extension}")
@@ -132,8 +132,10 @@ defmodule NFTMediaHandler do
     path = "../../images/#{file_name}"
 
     with :ok <- File.write(path, body),
-         {:ok, video} = Video.open(path),
-         {:ok, image} <- Video.image_from_video(video, frame: 1) do
+         {:ok, image} <-
+           Image.Video.with_video(path, fn video ->
+             Image.Video.image_from_video(video, frame: 0)
+           end) do
       thumbnails = Resizer.resize(image, url, ".jpg")
 
       Enum.map(thumbnails, fn {size, image, file_name} ->
