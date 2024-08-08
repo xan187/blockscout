@@ -29,6 +29,14 @@ defmodule BlockScoutWeb.Notifier do
 
   @check_broadcast_sequence_period 500
 
+  case Application.compile_env(:explorer, :chain_type) do
+    :arbitrum ->
+      @chain_type_specific_events ~w(new_arbitrum_batches new_messages_to_arbitrum_amount)a
+
+    _ ->
+      nil
+  end
+
   def handle_event({:chain_event, :addresses, type, addresses}) when type in [:realtime, :on_demand] do
     Endpoint.broadcast("addresses:new_address", "count", %{count: Counters.address_estimated_count()})
 
@@ -169,16 +177,13 @@ defmodule BlockScoutWeb.Notifier do
   def handle_event({:chain_event, :token_transfers, :realtime, all_token_transfers}) do
     all_token_transfers_full =
       all_token_transfers
-      |> Enum.map(
-        &(&1
-          |> Repo.preload(
-            DenormalizationHelper.extend_transaction_preload([
-              :token,
-              :transaction,
-              from_address: [:names, :smart_contract, :proxy_implementations],
-              to_address: [:names, :smart_contract, :proxy_implementations]
-            ])
-          ))
+      |> Repo.preload(
+        DenormalizationHelper.extend_transaction_preload([
+          :token,
+          :transaction,
+          from_address: [:names, :smart_contract, :proxy_implementations],
+          to_address: [:names, :smart_contract, :proxy_implementations]
+        ])
       )
 
     transfers_by_token = Enum.group_by(all_token_transfers_full, fn tt -> to_string(tt.token_contract_address_hash) end)
@@ -278,6 +283,16 @@ defmodule BlockScoutWeb.Notifier do
     Endpoint.broadcast("addresses:#{address_current_token_balances.address_hash}", "address_current_token_balances", %{
       address_current_token_balances: address_current_token_balances.address_current_token_balances
     })
+  end
+
+  case Application.compile_env(:explorer, :chain_type) do
+    :arbitrum ->
+      def handle_event({:chain_event, topic, _, _} = event) when topic in @chain_type_specific_events,
+        # credo:disable-for-next-line Credo.Check.Design.AliasUsage
+        do: BlockScoutWeb.Notifiers.Arbitrum.handle_event(event)
+
+    _ ->
+      nil
   end
 
   def handle_event(event) do

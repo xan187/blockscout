@@ -2221,6 +2221,12 @@ defmodule Explorer.ChainTest do
   end
 
   describe "transaction_estimated_count/1" do
+    setup do
+      Supervisor.terminate_child(Explorer.Supervisor, Explorer.Chain.Cache.Transaction.child_id())
+      Supervisor.restart_child(Explorer.Supervisor, Explorer.Chain.Cache.Transaction.child_id())
+      :ok
+    end
+
     test "returns integer" do
       assert is_integer(TransactionCache.estimated_count())
     end
@@ -4327,6 +4333,18 @@ defmodule Explorer.ChainTest do
                "Error(string reason)",
                [{"reason", "string", "No credit of that type"}]
              }
+    end
+  end
+
+  describe "timestamp_to_block_number/3" do
+    test "returns correct block number when given timestamp is equal to block timestamp" do
+      timestamp = DateTime.from_unix!(60 * 60 * 24 * 1, :second)
+      block = insert(:block, timestamp: timestamp)
+      expected = {:ok, block.number}
+
+      assert ^expected = Chain.timestamp_to_block_number(timestamp, :after, true)
+
+      assert ^expected = Chain.timestamp_to_block_number(timestamp, :before, true)
     end
   end
 end

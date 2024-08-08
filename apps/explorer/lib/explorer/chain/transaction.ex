@@ -122,6 +122,28 @@ defmodule Explorer.Chain.Transaction.Schema do
                             2
                           )
 
+                        :celo ->
+                          elem(
+                            quote do
+                              field(:gateway_fee, Wei)
+
+                              belongs_to(:gas_fee_recipient, Address,
+                                foreign_key: :gas_fee_recipient_address_hash,
+                                references: :hash,
+                                type: Hash.Address
+                              )
+
+                              belongs_to(:gas_token_contract_address, Address,
+                                foreign_key: :gas_token_contract_address_hash,
+                                references: :hash,
+                                type: Hash.Address
+                              )
+
+                              has_one(:gas_token, through: [:gas_token_contract_address, :token])
+                            end,
+                            2
+                          )
+
                         :arbitrum ->
                           elem(
                             quote do
@@ -296,6 +318,9 @@ defmodule Explorer.Chain.Transaction do
 
                                 :arbitrum ->
                                   ~w(gas_used_for_l1)a
+
+                                :celo ->
+                                  ~w(gateway_fee gas_fee_recipient_address_hash gas_token_contract_address_hash)a
 
                                 _ ->
                                   ~w()a
@@ -1856,5 +1881,23 @@ defmodule Explorer.Chain.Transaction do
           transaction.from_address_hash == ^address_hash or transaction.to_address_hash == ^address_hash
         )
     end
+  end
+
+  @doc """
+    Returns the number of transactions included into the blocks of the specified block range.
+    Only consensus blocks are taken into account.
+  """
+  @spec tx_count_for_block_range(Range.t()) :: non_neg_integer()
+  def tx_count_for_block_range(from..to) do
+    Repo.replica().aggregate(
+      from(
+        t in Transaction,
+        inner_join: b in Block,
+        on: b.number == t.block_number and b.consensus == true,
+        where: t.block_number >= ^from and t.block_number <= ^to
+      ),
+      :count,
+      timeout: :infinity
+    )
   end
 end

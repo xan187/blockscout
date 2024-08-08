@@ -107,6 +107,8 @@ defmodule BlockScoutWeb.Routers.ApiRouter do
 
     scope "/config" do
       get("/backend-version", V2.ConfigController, :backend_version)
+      get("/csv-export", V2.ConfigController, :csv_export)
+      get("/public-metrics", V2.ConfigController, :public_metrics)
     end
 
     scope "/transactions" do
@@ -124,6 +126,10 @@ defmodule BlockScoutWeb.Routers.ApiRouter do
 
       if Application.compile_env(:explorer, :chain_type) == :arbitrum do
         get("/arbitrum-batch/:batch_number", V2.TransactionController, :arbitrum_batch)
+      end
+
+      if Application.compile_env(:explorer, :chain_type) == :optimism do
+        get("/optimism-batch/:batch_number", V2.TransactionController, :optimism_batch)
       end
 
       if Application.compile_env(:explorer, :chain_type) == :suave do
@@ -153,6 +159,11 @@ defmodule BlockScoutWeb.Routers.ApiRouter do
       if Application.compile_env(:explorer, :chain_type) == :arbitrum do
         get("/arbitrum-batch/:batch_number", V2.BlockController, :arbitrum_batch)
       end
+
+      if Application.compile_env(:explorer, :chain_type) == :celo do
+        get("/:block_hash_or_number/epoch", V2.BlockController, :celo_epoch)
+        get("/:block_hash_or_number/election-rewards/:reward_type", V2.BlockController, :celo_election_rewards)
+      end
     end
 
     scope "/addresses" do
@@ -172,6 +183,10 @@ defmodule BlockScoutWeb.Routers.ApiRouter do
       get("/:address_hash_param/withdrawals", V2.AddressController, :withdrawals)
       get("/:address_hash_param/nft", V2.AddressController, :nft_list)
       get("/:address_hash_param/nft/collections", V2.AddressController, :nft_collections)
+
+      if Application.compile_env(:explorer, :chain_type) == :celo do
+        get("/:address_hash_param/election-rewards", V2.AddressController, :celo_election_rewards)
+      end
     end
 
     scope "/main-page" do
@@ -215,6 +230,11 @@ defmodule BlockScoutWeb.Routers.ApiRouter do
       if Application.compile_env(:explorer, :chain_type) == :optimism do
         get("/txn-batches", V2.OptimismController, :txn_batches)
         get("/txn-batches/count", V2.OptimismController, :txn_batches_count)
+        get("/txn-batches/:l2_block_range_start/:l2_block_range_end", V2.OptimismController, :txn_batches)
+        get("/batches", V2.OptimismController, :batches)
+        get("/batches/count", V2.OptimismController, :batches_count)
+        get("/batches/da/celestia/:height/:commitment", V2.OptimismController, :batch_by_celestia_blob)
+        get("/batches/:internal_id", V2.OptimismController, :batch_by_internal_id)
         get("/output-roots", V2.OptimismController, :output_roots)
         get("/output-roots/count", V2.OptimismController, :output_roots_count)
         get("/deposits", V2.OptimismController, :deposits)
@@ -332,6 +352,8 @@ defmodule BlockScoutWeb.Routers.ApiRouter do
         get("/batches", V2.ArbitrumController, :batches)
         get("/batches/count", V2.ArbitrumController, :batches_count)
         get("/batches/:batch_number", V2.ArbitrumController, :batch)
+        get("/batches/da/anytrust/:data_hash", V2.ArbitrumController, :batch_by_data_availability_info)
+        get("/batches/da/celestia/:height/:tx_commitment", V2.ArbitrumController, :batch_by_data_availability_info)
       end
     end
 
