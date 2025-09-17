@@ -8,6 +8,7 @@
 
 ### 🐛 Bug Fixes
 
+- Soften deposits deletion condition ([#13234](https://github.com/blockscout/blockscout/pull/13234))
 - Fix logic of checking finishing of heavy DB index operation ([#13231](https://github.com/blockscout/blockscout/pull/13231))
 - Remove requirement for beacon deposit indexes to be sequential ([#13228](https://github.com/blockscout/blockscout/pull/13228))
 
@@ -17,6 +18,7 @@
 
 ### ⚙️ Miscellaneous Tasks
 
+- Do not modify deposit indexer state on reorgs ([#13236](https://github.com/blockscout/blockscout/pull/13236))
 - Refactoring reputation ([#13221](https://github.com/blockscout/blockscout/issues/13221))
 
 ## 9.1.0
